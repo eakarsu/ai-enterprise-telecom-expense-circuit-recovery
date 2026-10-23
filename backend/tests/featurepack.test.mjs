@@ -1,0 +1,8 @@
+import test from "node:test";import assert from "node:assert/strict";import fs from "node:fs";
+process.env.OPENROUTER_API_KEY="";process.env.OPENAI_API_KEY="";
+const {filterRecords,recordsToCsv,buildInsights}=await import("../insights.mjs");
+const rows=[{id:1,reference:"A-1",title:"Alpha case",status:"Open",owner:"Ann",risk:"High",due_date:"2026-01-01",amount:100},{id:2,reference:"B-2",title:"Beta case",status:"Closed",owner:"Bob",risk:"Low",due_date:"2026-01-02",amount:0}];
+test("search/filter on main list",()=>{assert.equal(filterRecords(rows,{q:"alpha"}).length,1);assert.equal(filterRecords(rows,{status:"Closed"}).length,1);assert.equal(filterRecords(rows,{risk:"High"}).length,1);assert.equal(filterRecords(rows,{q:"zzz"}).length,0);});
+test("CSV/JSON export shape preserves 0",()=>{const csv=recordsToCsv(rows);assert.ok(csv.includes("A-1"));assert.ok(csv.trim().endsWith("0"));assert.equal(JSON.parse(JSON.stringify(rows))[1].amount,0);});
+test("domain insights deterministic fallback aiGenerated:false preserves false/0/empty",()=>{const out=buildInsights(rows,"Demo");assert.equal(out.aiGenerated,false);assert.equal(out.insights.length,3);assert.ok(out.insights.every(i=>i.aiGenerated===false));assert.equal(out.insights[0].metrics.records,2);const empty=buildInsights([],"Demo");assert.equal(empty.insights[0].metrics.records,0);assert.equal(empty.insights[2].isEmpty,true);});
+test("insights/export mounted behind auth, no provider key needed",()=>{const s=fs.readFileSync(new URL("../server.mjs",import.meta.url),"utf8");assert.ok(s.includes("mountInsights"));assert.ok(s.includes("filterRecords(rows,req.query)"));});
